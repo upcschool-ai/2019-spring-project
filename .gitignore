@@ -1,0 +1,5 @@
+# Jetbrains IDE
+/.idea/
+
+# Python stuff
+*.pyc
