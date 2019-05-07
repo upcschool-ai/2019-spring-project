@@ -26,8 +26,8 @@ class LinearRegressor(Operation):
         pass
 
     def forward(self, *inputs):
+        input_tensor = inputs[0]
         # TODO: compute the forward pass
-        pass
 
     def backward(self, gradient):
         # TODO: compute the outgoing gradients
@@ -36,9 +36,9 @@ class LinearRegressor(Operation):
 
 class MSELoss(Operation):
 
-    def forward(self, *predictions):
+    def forward(self, *inputs):
+        prediction, gt = inputs
         # TODO: compute the loss given the predictions
-        pass
 
     def backward(self, gradient):
         # TODO: compute the gradient for the predictions
