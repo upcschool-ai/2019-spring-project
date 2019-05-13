@@ -111,7 +111,7 @@ class SGDOptimizer(object):
         return tf.group(optimize_ops)
 
 
-def main(learning_rate):
+def main(learning_rate, logdir):
     graph = tf.Graph()
     with graph.as_default():
         dataset = aidl.SampleGenerator()
@@ -135,10 +135,13 @@ def main(learning_rate):
         print 'W GT: {}. W pred: {}'.format(dataset.W, W_pred)
         print 'b GT: {}. b pred: {}'.format(dataset.b, b_pred)
 
+    writer = tf.summary.FileWriter(logdir, graph=graph)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-lr', '--learning_rate', type=float, default=10e-6,
                         help='Learning rate for the optimization step')
+    parser.add_argument('-l', '--logdir', help='Log dir for tfevents')
     args = parser.parse_args()
-    main(args.learning_rate)
+    main(args.learning_rate, args.logdir)
