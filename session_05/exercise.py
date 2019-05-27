@@ -17,29 +17,10 @@ class Operation(object):
     def __init__(self, scope=None):
         with tf.variable_scope(scope, default_name=self.__class__.__name__) as captured_scope:
             self._scope = captured_scope
-        self._local_derivatives = {}
-        self._gradients = {}
-
-    def add_local_derivative(self, name, value):
-        self._local_derivatives[name] = value
-
-    def get_local_derivative(self, name):
-        return self._local_derivatives[name]
-
-    def add_gradient(self, name, value):
-        self._gradients[name] = value
-
-    def get_gradient(self, name):
-        return self._gradients[name]
 
     @abstractmethod
     def forward(self, *inputs):
         """Compute the operation given the inputs"""
-        pass
-
-    @abstractmethod
-    def backward(self, gradient):
-        """Compute the outgoing gradient and any intermediate one given the flowing gradients"""
         pass
 
 
@@ -65,20 +46,8 @@ class LinearRegressor(Operation):
             z = self.W * input_tensor
             y = z + self.b
 
-            # Compute local derivatives
-            self.add_local_derivative(LinearRegressor.WEIGHT, input_tensor)
-            self.add_local_derivative(LinearRegressor.BIAS, 1)
-            self.add_local_derivative(LinearRegressor.INPUT, self.W)
-
             # Return estimation of y
             return y
-
-    def backward(self, gradient):
-        with tf.name_scope(self._scope.name):
-            for tensor_name, local_derivative in self._local_derivatives.iteritems():
-                tensor_gradient = gradient * local_derivative
-                self.add_gradient(tensor_name, tensor_gradient)
-            return self.get_gradient(LinearRegressor.INPUT)
 
 
 class MSELoss(Operation):
@@ -90,36 +59,7 @@ class MSELoss(Operation):
             # Compute the loss
             diff = prediction - gt
             loss = tf.pow(diff, 2)
-            # Compute the local derivative
-            local_derivative = 2 * diff
-            self.add_local_derivative(MSELoss.PREDICTION, local_derivative)
             return loss
-
-    def backward(self, gradient):
-        with tf.name_scope(self._scope.name):
-            out_gradient = gradient * self.get_local_derivative(MSELoss.PREDICTION)
-            self.add_gradient(MSELoss.PREDICTION, out_gradient)
-            return out_gradient
-
-
-class SGDOptimizer(object):
-    def __init__(self, learning_rate):
-        self.learning_rate = learning_rate
-
-    def optimize(self, model, loss):
-        with tf.name_scope('SGD'):
-            with tf.name_scope('backprop'):
-                loss_gradient = loss.backward(1)
-                _ = model.backward(loss_gradient)
-                trainable_vars = model.trainable_variables
-
-            with tf.name_scope('apply_gradients'):
-                optimize_ops = []
-                for var_name, trainable_var in trainable_vars.iteritems():
-                    optimization_step = -1 * self.learning_rate * model.get_gradient(var_name)
-                    optimize_op = trainable_var.assign_add(optimization_step)
-                    optimize_ops.append(optimize_op)
-                return tf.group(optimize_ops)
 
 
 def main(learning_rate, logdir):
@@ -128,13 +68,13 @@ def main(learning_rate, logdir):
         dataset = aidl.SampleGenerator()
         model = LinearRegressor()
         loss = MSELoss()
-        optimizer = SGDOptimizer(learning_rate=learning_rate)
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
 
         x = tf.placeholder(dtype=tf.float32, name='x')
         y = tf.placeholder(dtype=tf.float32, name='y')
         prediction = model.forward(x)
         loss_op = loss.forward(prediction, y)
-        train_op = optimizer.optimize(model, loss)
+        train_op = optimizer.minimize(loss_op)
 
     with tf.Session(graph=graph) as sess:
         sess.run(tf.global_variables_initializer())
