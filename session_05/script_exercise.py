@@ -27,28 +27,35 @@ def main(learning_rate, logdir):
 
         # ------------------------ FORWARD PASS -----------------------------------
         # Linear regression forward pass
-        W = tf.get_variable('W', shape=[], dtype=tf.float32)
-        b = tf.get_variable('b', shape=[], dtype=tf.float32)
-        z = W * x
-        pred = z + b
+        with tf.variable_scope('LinearRegressor'):
+            W = tf.get_variable('W', shape=[], dtype=tf.float32)
+            b = tf.get_variable('b', shape=[], dtype=tf.float32)
+            z = W * x
+            pred = z + b
 
         # Compute loss
-        diff = pred - y
-        loss = tf.pow(diff, 2)
+        with tf.name_scope('MSELoss'):
+            diff = pred - y
+            loss = tf.pow(diff, 2)
 
         # ------------------------ BACKWARD PASS -----------------------------------
-        # Loss backprop
-        loss_grad = 2 * diff
+        with tf.name_scope('SGD'):
+            with tf.name_scope('backprop'):
+                # Loss backprop
+                with tf.name_scope('MSELoss'):
+                    loss_grad = 2 * diff
 
-        # Linear regression backprop
-        W_grad = x * loss_grad
-        b_grad = 1 * loss_grad
-        x_grad = W * loss_grad
+                # Linear regression backprop
+                with tf.name_scope('LinearRegressor'):
+                    W_grad = x * loss_grad
+                    b_grad = 1 * loss_grad
+                    x_grad = W * loss_grad
 
-        # ------------------------ OPTIMIZATION -----------------------------------
-        W_update = W.assign(W - learning_rate * W_grad)
-        b_update = b.assign(b - learning_rate * b_grad)
-        train_op = tf.group(W_update, b_update)
+            # ------------------------ OPTIMIZATION -----------------------------------
+            with tf.name_scope('apply_gradients'):
+                W_update = W.assign(W - learning_rate * W_grad)
+                b_update = b.assign(b - learning_rate * b_grad)
+                train_op = tf.group(W_update, b_update)
 
     """
                 RUN PHASE

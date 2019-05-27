@@ -1,4 +1,5 @@
 import argparse
+import os
 from abc import ABCMeta, abstractmethod
 
 import tensorflow as tf
@@ -13,7 +14,9 @@ class Operation(object):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self):
+    def __init__(self, scope=None):
+        with tf.variable_scope(scope, default_name=self.__class__.__name__) as captured_scope:
+            self._scope = captured_scope
         self._local_derivatives = {}
         self._gradients = {}
 
@@ -45,53 +48,58 @@ class LinearRegressor(Operation):
     BIAS = 'b'
     INPUT = 'input'
 
-    def __init__(self):
-        super(LinearRegressor, self).__init__()
-        self.W = tf.get_variable(LinearRegressor.WEIGHT, shape=[], dtype=tf.float32)
-        self.b = tf.get_variable(LinearRegressor.BIAS, shape=[], dtype=tf.float32)
+    def __init__(self, scope=None):
+        super(LinearRegressor, self).__init__(scope=scope)
+        with tf.variable_scope(self._scope):
+            self.W = tf.get_variable(LinearRegressor.WEIGHT, shape=[], dtype=tf.float32)
+            self.b = tf.get_variable(LinearRegressor.BIAS, shape=[], dtype=tf.float32)
 
     @property
     def trainable_variables(self):
         return {LinearRegressor.WEIGHT: self.W, LinearRegressor.BIAS: self.b}
 
     def forward(self, *inputs):
-        input_tensor = inputs[0]
-        # Linear regression operations
-        z = self.W * input_tensor
-        y = z + self.b
+        with tf.name_scope(self._scope.original_name_scope):
+            input_tensor = inputs[0]
+            # Linear regression operations
+            z = self.W * input_tensor
+            y = z + self.b
 
-        # Compute local derivatives
-        self.add_local_derivative(LinearRegressor.WEIGHT, input_tensor)
-        self.add_local_derivative(LinearRegressor.BIAS, 1)
-        self.add_local_derivative(LinearRegressor.INPUT, self.W)
+            # Compute local derivatives
+            self.add_local_derivative(LinearRegressor.WEIGHT, input_tensor)
+            self.add_local_derivative(LinearRegressor.BIAS, 1)
+            self.add_local_derivative(LinearRegressor.INPUT, self.W)
 
-        # Return estimation of y
-        return y
+            # Return estimation of y
+            return y
 
     def backward(self, gradient):
-        for tensor_name, local_derivative in self._local_derivatives.iteritems():
-            tensor_gradient = gradient * local_derivative
-            self.add_gradient(tensor_name, tensor_gradient)
-        return self.get_gradient(LinearRegressor.INPUT)
+        with tf.name_scope(self._scope.name):
+            for tensor_name, local_derivative in self._local_derivatives.iteritems():
+                tensor_gradient = gradient * local_derivative
+                self.add_gradient(tensor_name, tensor_gradient)
+            return self.get_gradient(LinearRegressor.INPUT)
 
 
 class MSELoss(Operation):
     PREDICTION = 'prediction'
 
     def forward(self, *inputs):
-        prediction, gt = inputs
-        # Compute the loss
-        diff = prediction - gt
-        loss = tf.pow(diff, 2)
-        # Compute the local derivative
-        local_derivative = 2 * diff
-        self.add_local_derivative(MSELoss.PREDICTION, local_derivative)
-        return loss
+        with tf.name_scope(self._scope.original_name_scope):
+            prediction, gt = inputs
+            # Compute the loss
+            diff = prediction - gt
+            loss = tf.pow(diff, 2)
+            # Compute the local derivative
+            local_derivative = 2 * diff
+            self.add_local_derivative(MSELoss.PREDICTION, local_derivative)
+            return loss
 
     def backward(self, gradient):
-        out_gradient = gradient * self.get_local_derivative(MSELoss.PREDICTION)
-        self.add_gradient(MSELoss.PREDICTION, out_gradient)
-        return out_gradient
+        with tf.name_scope(self._scope.name):
+            out_gradient = gradient * self.get_local_derivative(MSELoss.PREDICTION)
+            self.add_gradient(MSELoss.PREDICTION, out_gradient)
+            return out_gradient
 
 
 class SGDOptimizer(object):
@@ -99,16 +107,19 @@ class SGDOptimizer(object):
         self.learning_rate = learning_rate
 
     def optimize(self, model, loss):
-        loss_gradient = loss.backward(1)
-        _ = model.backward(loss_gradient)
-        trainable_vars = model.trainable_variables
+        with tf.name_scope('SGD'):
+            with tf.name_scope('backprop'):
+                loss_gradient = loss.backward(1)
+                _ = model.backward(loss_gradient)
+                trainable_vars = model.trainable_variables
 
-        optimize_ops = []
-        for var_name, trainable_var in trainable_vars.iteritems():
-            optimization_step = -1 * self.learning_rate * model.get_gradient(var_name)
-            optimize_op = trainable_var.assign_add(optimization_step)
-            optimize_ops.append(optimize_op)
-        return tf.group(optimize_ops)
+            with tf.name_scope('apply_gradients'):
+                optimize_ops = []
+                for var_name, trainable_var in trainable_vars.iteritems():
+                    optimization_step = -1 * self.learning_rate * model.get_gradient(var_name)
+                    optimize_op = trainable_var.assign_add(optimization_step)
+                    optimize_ops.append(optimize_op)
+                return tf.group(optimize_ops)
 
 
 def main(learning_rate, logdir):
@@ -135,6 +146,8 @@ def main(learning_rate, logdir):
         print 'W GT: {}. W pred: {}'.format(dataset.W, W_pred)
         print 'b GT: {}. b pred: {}'.format(dataset.b, b_pred)
 
+    if not os.path.isdir(logdir):
+        os.makedirs(logdir)
     writer = tf.summary.FileWriter(logdir, graph=graph)
 
 
@@ -142,6 +155,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-lr', '--learning_rate', type=float, default=10e-6,
                         help='Learning rate for the optimization step')
-    parser.add_argument('-l', '--logdir', help='Log dir for tfevents')
+    parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
     args = parser.parse_args()
-    main(args.learning_rate, args.logdir)
+    main(args.learning_rate, os.path.expanduser(args.logdir))
