@@ -46,11 +46,12 @@ def _create_sample(image_path, label):
             mean_channel = [123.68, 116.779, 103.939]
             image = tf.cast(image, dtype=tf.float32)
             image = tf.subtract(image, mean_channel, name='mean_substraction')
-            image = tf.image.resize(image, size=(224, 224))
+            image = tf.image.resize(image, size=(256, 256))
 
         with tf.name_scope('data_augmentation'):
-            image = tf.image.random_brightness(image, max_delta=20)
+            image = tf.image.random_crop(image, size=(224, 224, 3))
             image = tf.image.random_flip_left_right(image)
+            image = tf.image.random_brightness(image, max_delta=20)
 
     return image, label
 
