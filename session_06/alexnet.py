@@ -16,6 +16,7 @@ import input_pipeline
 
 def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     # ----------------- DEFINITION PHASE ------------------- #
+    global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32, initializer=0, trainable=False)
     # Input pipeline
     with tf.device('/cpu:0'):
         with tf.name_scope('input_pipeline'):
@@ -39,13 +40,13 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
 
     # Optimizer
     optimizer = tf.train.MomentumOptimizer(learning_rate=0.1, momentum=0.9)
+    train_step = optimizer.minimize(loss, global_step=global_step)
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
         try:
             while True:
-                # TODO: run the train step. i.e.: `_, loss = sess.run([train_op, loss_op], feed_dict={...})
-                pass
+                _, loss_val = sess.run([train_step, loss])
         except tf.errors.OutOfRangeError:
             pass
 
