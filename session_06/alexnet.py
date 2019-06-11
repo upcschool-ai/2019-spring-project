@@ -24,7 +24,21 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
             images, labels = iterator.get_next()
 
     # Model definition
-    # TODO: implement AlexNet
+    conv1 = conv_layer(images, filters=96, kernel_size=(11, 11), strides=(4, 4), lrn=True, max_pool=True, scope='conv1')
+    conv2 = conv_layer(conv1, filters=256, kernel_size=(5, 5), lrn=True, max_pool=True, scope='conv2')
+    conv3 = conv_layer(conv2, filters=385, kernel_size=(3, 3), scope='conv3')
+    conv4 = conv_layer(conv3, filters=385, kernel_size=(3, 3), scope='conv4')
+    conv5 = conv_layer(conv4, filters=256, kernel_size=(3, 3), max_pool=True, scope='conv5')
+
+    fc1 = fully_connected(conv5, units=4096, dropout=0.5, scope='fc1')
+    fc2 = fully_connected(conv5, units=4096, dropout=0.5, scope='fc2')
+    logits = fully_connected(conv5, units=1000, scope='fc3')
+
+    # Loss
+    loss = tf.losses.softmax_cross_entropy(labels, logits)
+
+    # Optimizer
+    optimizer = tf.train.MomentumOptimizer(learning_rate=0.1, momentum=0.9)
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
@@ -39,6 +53,26 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     if not os.path.isdir(logdir):
         os.makedirs(logdir)
     writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
+
+
+def conv_layer(inputs, filters, kernel_size, strides=(1, 1), lrn=False, max_pool=False, scope='conv_layer'):
+    with tf.variable_scope(scope):
+        output = tf.layers.conv2d(inputs, filters=filters, kernel_size=kernel_size, strides=strides,
+                                  activation=tf.nn.relu)
+        if lrn:
+            output = tf.nn.lrn(output, depth_radius=5, bias=2, alpha=1e-4, beta=0.75)
+        if max_pool:
+            output = tf.layers.max_pooling2d(output, pool_size=(3, 3), strides=(2, 2))
+        return output
+
+
+def fully_connected(inputs, units, activation=tf.nn.relu, dropout=None, scope='fully_connected'):
+    with tf.variable_scope(scope):
+        output = tf.layers.dense(inputs, units=units, activation=activation)
+        if dropout:
+            output = tf.nn.dropout(output, keep_prob=dropout)
+
+        return output
 
 
 if __name__ == '__main__':

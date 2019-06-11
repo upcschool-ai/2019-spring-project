@@ -49,7 +49,7 @@ def _create_sample(image_path, label):
             image = tf.image.resize(image, size=(256, 256))
 
         with tf.name_scope('data_augmentation'):
-            image = tf.image.random_crop(image, size=(224, 224, 3))
+            image = tf.image.random_crop(image, size=(227, 227, 3))
             image = tf.image.random_flip_left_right(image)
             image = tf.image.random_brightness(image, max_delta=20)
 
