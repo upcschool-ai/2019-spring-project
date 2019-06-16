@@ -4,6 +4,8 @@ https://www.tensorflow.org/guide/datasets
 https://www.tensorflow.org/api_docs/python/tf/data/Dataset
 https://www.tensorflow.org/guide/performance/datasets
 """
+from __future__ import print_function
+
 import argparse
 import csv
 import multiprocessing
@@ -12,8 +14,8 @@ import os
 import tensorflow as tf
 
 
-def create_dataset(dataset_path, images_dir, num_epochs, batch_size):
-    dataset = tf.data.Dataset.from_generator(lambda: _generator(dataset_path, images_dir),
+def create_dataset(dataset_csv, dataset_dir, num_epochs, batch_size):
+    dataset = tf.data.Dataset.from_generator(lambda: _generator(dataset_csv, dataset_dir),
                                              output_types=(tf.string, tf.string),
                                              output_shapes=(tf.TensorShape([]), tf.TensorShape([])))
     dataset = dataset.repeat(num_epochs)
@@ -24,11 +26,11 @@ def create_dataset(dataset_path, images_dir, num_epochs, batch_size):
     return dataset
 
 
-def _generator(path, images_dir):
+def _generator(path, dataset_dir):
     with open(path) as f:
         reader = csv.reader(f)
         for label, image_path in reader:
-            image_path = os.path.join(images_dir, image_path)
+            image_path = os.path.join(dataset_dir, image_path)
             yield image_path, label
 
 
@@ -54,16 +56,17 @@ def _create_sample(image_path, label):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pipeline execution')
-    parser.add_argument('dataset_path', help='Path to dataset description')
-    parser.add_argument('images_dir', help='Image directory')
+    parser.add_argument('dataset_csv', help='Path to the CSV decribing the dataset')
+    parser.add_argument('dataset_dir', help='Directory where the csv and the images folder are located')
     parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
     parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
     parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
+
     args = parser.parse_args()
 
     with tf.device('/cpu:0'):
         with tf.name_scope('input_pipeline'):
-            dataset = create_dataset(args.dataset_path, args.images_dir, args.num_epochs, args.batch_size)
+            dataset = create_dataset(args.dataset_csv, args.dataset_dir, args.num_epochs, args.batch_size)
             iterator = dataset.make_one_shot_iterator()
             batch = iterator.get_next()
 
@@ -71,7 +74,7 @@ if __name__ == '__main__':
         try:
             while True:
                 images, labels = sess.run(batch)
-                print images.shape, labels.shape
+                print('Images shape: {}\tLabels shape: {}'.format(images.shape, labels.shape))
         except tf.errors.OutOfRangeError:
             pass
 
