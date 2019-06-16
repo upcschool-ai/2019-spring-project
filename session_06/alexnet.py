@@ -32,8 +32,8 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     conv5 = conv_layer(conv4, filters=256, kernel_size=(3, 3), max_pool=True, scope='conv5')
 
     fc1 = fully_connected(conv5, units=4096, dropout=0.5, scope='fc1')
-    fc2 = fully_connected(conv5, units=4096, dropout=0.5, scope='fc2')
-    logits = fully_connected(conv5, units=1000, scope='fc3')
+    fc2 = fully_connected(fc1, units=4096, dropout=0.5, scope='fc2')
+    logits = fully_connected(fc2, units=1000, scope='fc3')
 
     # Loss
     loss = tf.losses.softmax_cross_entropy(labels, logits)
@@ -46,7 +46,8 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     with tf.Session() as sess:
         try:
             while True:
-                _, loss_val = sess.run([train_step, loss])
+                _, loss_value, iteration = sess.run([train_step, loss, global_step])
+                print 'Iteration [{}]. Loss: {}'.format(iteration, loss_value)
         except tf.errors.OutOfRangeError:
             pass
 
