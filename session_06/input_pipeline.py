@@ -27,13 +27,9 @@ def create_dataset(dataset_path, images_dir, num_epochs, batch_size):
 def _generator(path, images_dir):
     with open(path) as f:
         reader = csv.reader(f)
-        try:
-            while True:
-                label, image_path = next(reader)
-                image_path = os.path.join(images_dir, image_path)
-                yield image_path, label
-        except StopIteration:
-            pass
+        for label, image_path in reader:
+            image_path = os.path.join(images_dir, image_path)
+            yield image_path, label
 
 
 def _create_sample(image_path, label):
