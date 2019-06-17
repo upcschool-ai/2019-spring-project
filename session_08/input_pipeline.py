@@ -8,6 +8,7 @@ from __future__ import print_function
 
 import argparse
 import csv
+import itertools
 import multiprocessing
 import os
 
@@ -38,16 +39,16 @@ def _create_sample(image_path, label):
     with tf.name_scope('create_sample'):
         with tf.name_scope('read_image'):
             raw_image = tf.read_file(image_path)
-            image = tf.image.decode_jpeg(raw_image, channels=3)
+            image = tf.image.decode_png(raw_image, channels=3)
 
-        with tf.name_scope('preprocessing'):
-            mean_channel = [123.68, 116.779, 103.939]
-            image = tf.cast(image, dtype=tf.float32)
-            image = tf.subtract(image, mean_channel, name='mean_substraction')
-            image = tf.image.resize(image, size=(256, 256))
+        # with tf.name_scope('preprocessing'):
+        #     mean_channel = [123.68, 116.779, 103.939]
+        #     image = tf.cast(image, dtype=tf.float32)
+        #     image = tf.subtract(image, mean_channel, name='mean_substraction')
+        #     image = tf.image.resize(image, size=(256, 256))
 
         with tf.name_scope('data_augmentation'):
-            image = tf.image.random_crop(image, size=(227, 227, 3))
+            # image = tf.image.random_crop(image, size=(227, 227, 3))
             image = tf.image.random_flip_left_right(image)
             image = tf.image.random_brightness(image, max_delta=20)
 
@@ -72,9 +73,9 @@ if __name__ == '__main__':
 
     with tf.Session() as sess:
         try:
-            while True:
+            for step in itertools.count(start=1, step=1):
                 images, labels = sess.run(batch)
-                print('Images shape: {}\tLabels shape: {}'.format(images.shape, labels.shape))
+                print('[Step={}] Images shape: {}\tLabels shape: {}'.format(step, images.shape, labels.shape))
         except tf.errors.OutOfRangeError:
             pass
 
