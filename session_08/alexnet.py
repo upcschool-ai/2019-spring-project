@@ -11,6 +11,7 @@ from __future__ import print_function
 import argparse
 import os
 
+import numpy as np
 import tensorflow as tf
 
 import input_pipeline
@@ -19,7 +20,7 @@ import input_pipeline
 NUMBER_CLASSES = 2
 
 
-def main(dataset_csv, images_dir, num_epochs, batch_size, logdir):
+def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir):
     # ----------------- TRAINING LOOP SETUP ---------------- #
     logdir = os.path.expanduser(logdir)
     if not os.path.isdir(logdir):
@@ -69,12 +70,17 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, logdir):
     tf.summary.scalar('loss', loss_op)
 
     # Optimizer
-    optimizer = tf.train.MomentumOptimizer(learning_rate=0.0001, momentum=0.9)
+    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
     train_step = optimizer.minimize(loss_op, global_step=global_step)
 
     # Summary writer
     writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
     summary_op = tf.summary.merge_all()
+
+    num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
+    print('*'*80)
+    print('Num trainable parameters: {!r}'.format(num_trainable_params))
+    print('*'*80)
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
@@ -127,6 +133,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
     parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
     parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
     args = parser.parse_args()
 
-    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.logdir)
+    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir)
