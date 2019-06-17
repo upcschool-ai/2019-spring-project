@@ -11,6 +11,7 @@ from __future__ import print_function
 import argparse
 import os
 
+import numpy as np
 import tensorflow as tf
 
 import input_pipeline
@@ -19,7 +20,7 @@ import input_pipeline
 NUMBER_CLASSES = 2
 
 
-def main(dataset_csv, images_dir, num_epochs, batch_size, logdir):
+def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir):
     # ----------------- TRAINING LOOP SETUP ---------------- #
     logdir = os.path.expanduser(logdir)
     if not os.path.isdir(logdir):
@@ -41,6 +42,11 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, logdir):
     # Loss and optimizer
     # TODO: include an appropriate loss for the problem and an optimizer to create a training op
     # Parameter suggestion: learning rate ~= 1E-4
+
+    num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
+    print('*'*80)
+    print('Num trainable parameters: {!r}'.format(num_trainable_params))
+    print('*'*80)
 
     # Summary writer
     writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
@@ -66,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
     parser.add_argument('-e', '--num_epochs', type=int, default=5, help='Number of epochs')
     parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
     args = parser.parse_args()
 
-    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.logdir)
+    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.lr, args.logdir)
