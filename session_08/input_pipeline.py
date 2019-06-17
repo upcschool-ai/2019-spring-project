@@ -21,7 +21,7 @@ def create_dataset(dataset_csv, images_dir, num_epochs, batch_size):
                                              output_types=(tf.string, tf.string),
                                              output_shapes=(tf.TensorShape([]), tf.TensorShape([])))
     dataset = dataset.repeat(num_epochs)
-    dataset = dataset.shuffle(100)  # Shuffling buffer
+    dataset = dataset.shuffle(500)  # Shuffling buffer
     dataset = dataset.map(_create_sample, num_parallel_calls=multiprocessing.cpu_count())
     dataset = dataset.batch(batch_size=batch_size)
     dataset = dataset.prefetch(10)  # Pipelining
@@ -42,6 +42,7 @@ def _create_sample(image_path, label):
             raw_image = tf.read_file(image_path)
             image = tf.image.decode_jpeg(raw_image, channels=3)
             label = tf.strings.to_number(label, out_type=tf.int32)
+            label = tf.one_hot(label, depth=2)
 
         with tf.name_scope('preprocessing'):
             mean_channel = [123.68, 116.779, 103.939]
@@ -78,6 +79,8 @@ if __name__ == '__main__':
             for step in itertools.count(start=1, step=1):
                 images, labels = sess.run(batch)
                 print('[Step={}] Images shape: {}\tLabels shape: {}'.format(step, images.shape, labels.shape))
+                print(images.dtype.name)
+                print(labels)
         except tf.errors.OutOfRangeError:
             pass
 
