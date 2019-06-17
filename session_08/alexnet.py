@@ -75,4 +75,4 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
     args = parser.parse_args()
 
-    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.lr, args.logdir)
+    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir)
