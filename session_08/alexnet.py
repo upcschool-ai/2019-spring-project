@@ -16,6 +16,9 @@ import tensorflow as tf
 import input_pipeline
 
 
+NUMBER_CLASSES = 5
+
+
 def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     # ----------------- TRAINING LOOP SETUP ---------------- #
     logdir = os.path.expanduser(logdir)
@@ -38,6 +41,7 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
 
     # Loss and optimizer
     # TODO: include an appropriate loss for the problem and an optimizer to create a training op
+    # Parameter suggestion: learning rate ~= 1E-4
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
@@ -56,10 +60,10 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pipeline execution')
     parser.add_argument('dataset_csv', help='Path to the CSV decribing the dataset')
-    parser.add_argument('dataset_dir', help='Directory where the csv and the images folder are located')
+    parser.add_argument('images_dir', help='Path to the images directory')
     parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
-    parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
-    parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
+    parser.add_argument('-e', '--num_epochs', type=int, default=5, help='Number of epochs')
+    parser.add_argument('-b', '--batch_size', type=int, default=8, help='Batch size')
     args = parser.parse_args()
 
-    main(args.dataset_csv, args.dataset_dir, args.num_epochs, args.batch_size, args.logdir)
+    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.logdir)
