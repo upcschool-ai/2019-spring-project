@@ -16,15 +16,14 @@ import tensorflow as tf
 import input_pipeline
 
 
-NUMBER_CLASSES = 5
+NUMBER_CLASSES = 2
 
 
-def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
+def main(dataset_csv, images_dir, num_epochs, batch_size, logdir):
     # ----------------- TRAINING LOOP SETUP ---------------- #
     logdir = os.path.expanduser(logdir)
     if not os.path.isdir(logdir):
         os.makedirs(logdir)
-    writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
 
     # ----------------- DEFINITION PHASE ------------------- #
     global_step = tf.get_variable('global_step', dtype=tf.int32, initializer=0, trainable=False)
@@ -32,7 +31,7 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     # Input pipeline
     with tf.device('/cpu:0'):
         with tf.name_scope('input_pipeline'):
-            dataset = input_pipeline.create_dataset(dataset_path, images_dir, num_epochs, batch_size)
+            dataset = input_pipeline.create_dataset(dataset_csv, images_dir, num_epochs, batch_size)
             iterator = dataset.make_one_shot_iterator()
             images, labels = iterator.get_next()
 
@@ -42,6 +41,9 @@ def main(dataset_path, images_dir, num_epochs, batch_size, logdir):
     # Loss and optimizer
     # TODO: include an appropriate loss for the problem and an optimizer to create a training op
     # Parameter suggestion: learning rate ~= 1E-4
+
+    # Summary writer
+    writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('images_dir', help='Path to the images directory')
     parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
     parser.add_argument('-e', '--num_epochs', type=int, default=5, help='Number of epochs')
-    parser.add_argument('-b', '--batch_size', type=int, default=8, help='Batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size')
     args = parser.parse_args()
 
     main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.logdir)
