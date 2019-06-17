@@ -113,7 +113,6 @@ def fully_connected(inputs, units, activation=tf.nn.relu, dropout_rate=None, sco
             units=units, activation=activation,
             kernel_initializer=tf.initializers.random_normal(mean=0, stddev=0.01),
             bias_initializer=tf.initializers.ones(),
-            kernel_regularizer=tf.keras.regularizers.l2(1e-5),
         )(inputs)
         if dropout_rate:
             output = tf.layers.Dropout(rate=dropout_rate)(output, training=True)
