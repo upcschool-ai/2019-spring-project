@@ -79,8 +79,6 @@ if __name__ == '__main__':
             for step in itertools.count(start=1, step=1):
                 images, labels = sess.run(batch)
                 print('[Step={}] Images shape: {}\tLabels shape: {}'.format(step, images.shape, labels.shape))
-                print(images.dtype.name)
-                print(labels)
         except tf.errors.OutOfRangeError:
             pass
 
