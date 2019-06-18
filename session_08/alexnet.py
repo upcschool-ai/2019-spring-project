@@ -18,9 +18,11 @@ import input_pipeline
 
 
 NUMBER_CLASSES = 2
+STEPS_LOSS_LOG = 10
+STEPS_SAVER = 20
 
 
-def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir):
+def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir, restore_weights):
     # ----------------- TRAINING LOOP SETUP ---------------- #
     logdir = os.path.expanduser(logdir)
     if not os.path.isdir(logdir):
@@ -57,25 +59,30 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir)
     print(conv5.get_shape().as_list())
 
     flat = tf.reshape(conv5, [-1, 5*5*256])
-    fc1 = fully_connected(flat, units=4096, dropout_rate=0, scope='fc1')
+    fc1 = fully_connected(flat, units=4096, dropout_rate=0.5, scope='fc1')
     tf.summary.histogram('fc1', fc1)
-    fc2 = fully_connected(fc1, units=4096, dropout_rate=0, scope='fc2')
+    fc2 = fully_connected(fc1, units=4096, dropout_rate=0.5, scope='fc2')
     tf.summary.histogram('fc2', fc2)
     logits = fully_connected(fc2, activation=None, units=NUMBER_CLASSES, scope='fc3')
     tf.summary.histogram('logits', logits)
     softmax = tf.nn.softmax(logits, name='softmax')
 
     # Loss
-    loss_op = tf.losses.softmax_cross_entropy(labels, logits)
+    xe_loss_op = tf.losses.softmax_cross_entropy(labels, logits)
+    loss_op = tf.losses.get_total_loss()
     tf.summary.scalar('loss', loss_op)
 
     # Optimizer
-    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     train_step = optimizer.minimize(loss_op, global_step=global_step)
 
     # Summary writer
     writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
     summary_op = tf.summary.merge_all()
+
+    # Weight saver
+    model_checkpoint_path = os.path.join(logdir, 'alexnet')
+    saver = tf.train.Saver()
 
     num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
     print('*'*80)
@@ -84,17 +91,22 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir)
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        if restore_weights:
+            saver.restore(sess, restore_weights)
+        else:
+            sess.run(tf.global_variables_initializer())
         try:
             while True:
                 # Run the train step
-                _, loss, step, summ_val, logits_val, labels_val, softmax_val = sess.run([train_step, loss_op, global_step, summary_op, logits, labels, softmax])
+                _, loss, step, summ_val = sess.run([train_step, loss_op, global_step, summary_op])
                 # Print how the loss is evolving per step in order to check if the model is converging
-                print('Step {}\tLoss={}'.format(step, loss))
-                # print('Logits: {}'.format(logits_val))
-                # print('Softmax: {}'.format(softmax_val))
-                # print('Labels: {}'.format(labels_val))
-                writer.add_summary(summ_val, global_step=step)
+                if step % STEPS_LOSS_LOG == 0:
+                    print('Step {}\tLoss={}'.format(step, loss))
+                    writer.add_summary(summ_val, global_step=step)
+                # Save the graph definition and its weights
+                if step % STEPS_SAVER == 0:
+                    print('Step {}\tSaving weights to {}'.format(step, model_checkpoint_path))
+                    saver.save(sess, save_path=model_checkpoint_path, global_step=global_step)
         except tf.errors.OutOfRangeError:
             pass
 
@@ -105,6 +117,7 @@ def conv_layer(inputs, filters, kernel_size, strides=(1, 1), lrn=False, max_pool
             filters=filters, kernel_size=kernel_size, strides=strides, activation=tf.nn.relu, padding=padding,
             kernel_initializer=tf.initializers.random_normal(mean=0, stddev=0.01),
             bias_initializer=tf.initializers.ones(),
+            kernel_regularizer=tf.keras.regularizers.l2(0.0005),
         )(inputs)
         if lrn:
             output = tf.nn.lrn(output, depth_radius=5, bias=2, alpha=1e-4, beta=0.75)
@@ -119,6 +132,7 @@ def fully_connected(inputs, units, activation=tf.nn.relu, dropout_rate=None, sco
             units=units, activation=activation,
             kernel_initializer=tf.initializers.random_normal(mean=0, stddev=0.01),
             bias_initializer=tf.initializers.ones(),
+            kernel_regularizer=tf.keras.regularizers.l2(0.0005),
         )(inputs)
         if dropout_rate:
             output = tf.layers.Dropout(rate=dropout_rate)(output, training=True)
@@ -134,6 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
     parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
+    parser.add_argument('-r', '--restore', help='Path to model checkpoint to restore weights from.')
     args = parser.parse_args()
 
-    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir)
+    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir, args.restore)
