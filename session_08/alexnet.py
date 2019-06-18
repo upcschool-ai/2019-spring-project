@@ -19,9 +19,10 @@ import input_pipeline
 
 NUMBER_CLASSES = 2
 STEPS_LOSS_LOG = 10
+STEPS_SAVER = 20
 
 
-def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir):
+def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir, restore_weights):
     # ----------------- TRAINING LOOP SETUP ---------------- #
     logdir = os.path.expanduser(logdir)
     if not os.path.isdir(logdir):
@@ -37,32 +38,51 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir)
             iterator = dataset.make_one_shot_iterator()
             images, labels = iterator.get_next()
 
+            tf.summary.image('input', images, max_outputs=batch_size)
+
     # Model
     print(images.get_shape().as_list())
     conv1 = conv_layer(images, filters=96, kernel_size=(11, 11), strides=(4, 4), lrn=True, max_pool=True, scope='conv1')
     print(conv1.get_shape().as_list())
+    tf.summary.histogram('conv1', conv1)
     conv2 = conv_layer(conv1, filters=256, kernel_size=(5, 5), lrn=True, max_pool=True, padding='same', scope='conv2')
     print(conv2.get_shape().as_list())
+    tf.summary.histogram('conv2', conv2)
     conv3 = conv_layer(conv2, filters=384, kernel_size=(3, 3), padding='same', scope='conv3')
     print(conv3.get_shape().as_list())
+    tf.summary.histogram('conv3', conv3)
     conv4 = conv_layer(conv3, filters=384, kernel_size=(3, 3), padding='same', scope='conv4')
     print(conv4.get_shape().as_list())
+    tf.summary.histogram('conv4', conv4)
     conv5 = conv_layer(conv4, filters=256, kernel_size=(3, 3), max_pool=True, scope='conv5')
+    tf.summary.histogram('conv5', conv5)
     print(conv5.get_shape().as_list())
 
     flat = tf.reshape(conv5, [-1, 5*5*256])
     fc1 = fully_connected(flat, units=4096, dropout_rate=0.5, scope='fc1')
+    tf.summary.histogram('fc1', fc1)
     fc2 = fully_connected(fc1, units=4096, dropout_rate=0.5, scope='fc2')
+    tf.summary.histogram('fc2', fc2)
     logits = fully_connected(fc2, activation=None, units=NUMBER_CLASSES, scope='fc3')
+    tf.summary.histogram('logits', logits)
     softmax = tf.nn.softmax(logits, name='softmax')
 
     # Loss
     xe_loss_op = tf.losses.softmax_cross_entropy(labels, logits)
     loss_op = tf.losses.get_total_loss()
+    tf.summary.scalar('loss', loss_op)
 
     # Optimizer
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     train_step = optimizer.minimize(loss_op, global_step=global_step)
+
+    # Summary writer
+    writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
+    summary_op = tf.summary.merge_all()
+
+    # Weight saver
+    model_checkpoint_path = os.path.join(logdir, 'alexnet')
+    saver = tf.train.Saver()
 
     num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
     print('*'*80)
@@ -71,14 +91,22 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir)
 
     # ----------------- RUN PHASE ------------------- #
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        if restore_weights:
+            saver.restore(sess, restore_weights)
+        else:
+            sess.run(tf.global_variables_initializer())
         try:
             while True:
                 # Run the train step
-                _, loss, step = sess.run([train_step, loss_op, global_step])
+                _, loss, step, summ_val = sess.run([train_step, loss_op, global_step, summary_op])
                 # Print how the loss is evolving per step in order to check if the model is converging
                 if step % STEPS_LOSS_LOG == 0:
                     print('Step {}\tLoss={}'.format(step, loss))
+                    writer.add_summary(summ_val, global_step=step)
+                # Save the graph definition and its weights
+                if step % STEPS_SAVER == 0:
+                    print('Step {}\tSaving weights to {}'.format(step, model_checkpoint_path))
+                    saver.save(sess, save_path=model_checkpoint_path, global_step=global_step)
         except tf.errors.OutOfRangeError:
             pass
 
@@ -120,6 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
     parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
+    parser.add_argument('-r', '--restore', help='Path to model checkpoint to restore weights from.')
     args = parser.parse_args()
 
-    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir)
+    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir, args.restore)
