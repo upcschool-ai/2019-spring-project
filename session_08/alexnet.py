@@ -18,6 +18,7 @@ import input_pipeline
 
 
 NUMBER_CLASSES = 2
+STEPS_LOSS_LOG = 10
 
 
 def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir):
@@ -41,7 +42,6 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir)
 
     # Loss and optimizer
     # TODO: include an appropriate loss for the problem and an optimizer to create a training op
-    # Parameter suggestion: learning rate ~= 1E-4
 
     num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
     print('*'*80)
@@ -70,8 +70,8 @@ if __name__ == '__main__':
     parser.add_argument('dataset_csv', help='Path to the CSV decribing the dataset')
     parser.add_argument('images_dir', help='Path to the images directory')
     parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
-    parser.add_argument('-e', '--num_epochs', type=int, default=5, help='Number of epochs')
-    parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size')
+    parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
+    parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
     args = parser.parse_args()
 
