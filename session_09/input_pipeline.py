@@ -12,7 +12,6 @@ import itertools
 import multiprocessing
 import os
 
-import numpy as np
 import tensorflow as tf
 
 
@@ -60,27 +59,50 @@ def _create_sample(image_path, label):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pipeline execution')
-    parser.add_argument('dataset_csv', help='Path to the CSV decribing the dataset')
+    parser.add_argument('train_dataset', help='Path to the CSV decribing the dataset')
+    parser.add_argument('val_dataset', help='Path to the CSV decribing the dataset')
     parser.add_argument('images_dir', help='Path to the images directory')
-    parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
+    parser.add_argument('-l', '--logdir', default='~/tmp/aidl/logs', help='Log dir for tfevents')
     parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
     parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
+    parser.add_argument('-v', '--val_iters', type=int, default=10, help='Steps from validation to validation')
 
     args = parser.parse_args()
 
     with tf.device('/cpu:0'):
-        # TODO: [Exercise VII] Modify the following code to create a train and validation dataset
         with tf.name_scope('input_pipeline'):
-            dataset = create_dataset(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size)
-            iterator = dataset.make_one_shot_iterator()
+            with tf.name_scope('training_dataset'):
+                train_dataset = create_dataset(args.train_dataset, args.images_dir, args.num_epochs, args.batch_size)
+                train_iterator = train_dataset.make_one_shot_iterator()
+            with tf.name_scope('validation_dataset'):
+                val_dataset = create_dataset(args.val_dataset, args.images_dir, 1, args.batch_size)
+                val_iterator = val_dataset.make_initializable_iterator()
+
+            handle = tf.placeholder(tf.string, shape=[])
+            iterator = tf.data.Iterator.from_string_handle(
+                handle, train_dataset.output_types, train_dataset.output_shapes)
             batch = iterator.get_next()
 
     with tf.Session() as sess:
+        train_handle = sess.run(train_iterator.string_handle())
+        val_handle = sess.run(val_iterator.string_handle())
         try:
-            # TODO: [Exercise VII] Run validation every 50 iterations
-            for step in itertools.count(start=1, step=1):
-                images, labels = sess.run(batch)
-                print('[Step={}] Images shape: {}\tLabels shape: {}'.format(step, images.shape, labels.shape))
+            for train_step in itertools.count(start=1, step=1):
+                images, labels = sess.run(batch, feed_dict={handle: train_handle})
+                print('TRAINING [Step={}] Images shape: {}\tLabels shape: {}'.format(train_step, images.shape,
+                                                                                     labels.shape))
+
+                # Validation
+                if train_step % args.val_iters == 0:
+                    try:
+                        sess.run(val_iterator.initializer)
+                        for val_step in itertools.count(start=1, step=1):
+                            images, labels = sess.run(batch, feed_dict={handle: val_handle})
+                            print(
+                                'VALIDATION [Step={}] Images shape: {}\tLabels shape: {}'.format(val_step, images.shape,
+                                                                                                 labels.shape))
+                    except tf.errors.OutOfRangeError:
+                        pass
         except tf.errors.OutOfRangeError:
             pass
 
