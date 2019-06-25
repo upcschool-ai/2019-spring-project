@@ -12,7 +12,6 @@ import itertools
 import multiprocessing
 import os
 
-import numpy as np
 import tensorflow as tf
 
 
@@ -69,7 +68,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with tf.device('/cpu:0'):
-        # TODO: [Exercise VII] Modify the following code to create a train and validation dataset
+        # TODO: [Exercise VII] 1. Modify the following code to create a train and validation dataset
         with tf.name_scope('input_pipeline'):
             dataset = create_dataset(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size)
             iterator = dataset.make_one_shot_iterator()
@@ -77,7 +76,7 @@ if __name__ == '__main__':
 
     with tf.Session() as sess:
         try:
-            # TODO: [Exercise VII] Run validation every 50 iterations
+            # TODO: [Exercise VII] 2. Run validation every 50 iterations
             for step in itertools.count(start=1, step=1):
                 images, labels = sess.run(batch)
                 print('[Step={}] Images shape: {}\tLabels shape: {}'.format(step, images.shape, labels.shape))
