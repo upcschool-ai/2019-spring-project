@@ -16,6 +16,7 @@ import tensorflow as tf
 
 
 def create_dataset(dataset_csv, images_dir, num_epochs, batch_size):
+    # TODO: [Exercise VIII] 1. Create dataset wrapper function
     dataset = tf.data.Dataset.from_generator(lambda: _generator(dataset_csv, images_dir),
                                              output_types=(tf.string, tf.string),
                                              output_shapes=(tf.TensorShape([]), tf.TensorShape([])))
