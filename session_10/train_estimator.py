@@ -1,10 +1,26 @@
 import argparse
 
+import tensorflow as tf
+
+import alexnet
+import input_pipeline
+
 
 def main(dataset_csv, images_dir, steps, batch_size, learning_rate, logdir):
-    # TODO: [Exercise VIII] 3. Import input_fn from input_pipeline & model_fn from alexnet
-    # TODO: [Exercise VIII] 4. Create tf.estimator.Estimator
-    # TODO: [Exercise VIII] 5. Train estimator
+    # Input pipeline
+    train_input_fn = input_pipeline.create_dataset(dataset_csv, images_dir, None, batch_size)
+
+    # Estimator params
+    estimator_params = dict(
+        num_classes=2,
+        learning_rate=learning_rate
+    )
+
+    # Estimator
+    estimator = tf.estimator.Estimator(model_fn=alexnet.alexnet, params=estimator_params, model_dir=logdir)
+
+    # Train
+    estimator.train(train_input_fn, max_steps=steps)
     pass
 
 

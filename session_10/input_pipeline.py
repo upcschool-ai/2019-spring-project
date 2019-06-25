@@ -16,16 +16,18 @@ import tensorflow as tf
 
 
 def create_dataset(dataset_csv, images_dir, num_epochs, batch_size):
-    # TODO: [Exercise VIII] 1. Create dataset wrapper function
-    dataset = tf.data.Dataset.from_generator(lambda: _generator(dataset_csv, images_dir),
-                                             output_types=(tf.string, tf.string),
-                                             output_shapes=(tf.TensorShape([]), tf.TensorShape([])))
-    dataset = dataset.repeat(num_epochs)
-    dataset = dataset.shuffle(500)  # Shuffling buffer
-    dataset = dataset.map(_create_sample, num_parallel_calls=multiprocessing.cpu_count())
-    dataset = dataset.batch(batch_size=batch_size)
-    dataset = dataset.prefetch(10)  # Pipelining
-    return dataset
+    def input_fn():
+        dataset = tf.data.Dataset.from_generator(lambda: _generator(dataset_csv, images_dir),
+                                                 output_types=(tf.string, tf.string),
+                                                 output_shapes=(tf.TensorShape([]), tf.TensorShape([])))
+        dataset = dataset.repeat(num_epochs)
+        dataset = dataset.shuffle(500)  # Shuffling buffer
+        dataset = dataset.map(_create_sample, num_parallel_calls=multiprocessing.cpu_count())
+        dataset = dataset.batch(batch_size=batch_size)
+        dataset = dataset.prefetch(10)  # Pipelining
+        return dataset
+
+    return input_fn
 
 
 def _generator(path, images_dir):

@@ -8,39 +8,13 @@ https://www.tensorflow.org/api_docs/python/tf/keras/layers
 """
 from __future__ import print_function
 
-import argparse
-import os
-
-import numpy as np
 import tensorflow as tf
 
-import input_pipeline
 
-NUMBER_CLASSES = 2
-STEPS_LOSS_LOG = 10
-STEPS_SAVER = 20
-
-
-# TODO: [Exercise VIII] 2. Create model_fn
-
-
-def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir, restore_weights):
-    # ----------------- TRAINING LOOP SETUP ---------------- #
-    logdir = os.path.expanduser(logdir)
-    if not os.path.isdir(logdir):
-        os.makedirs(logdir)
-
-    # ----------------- DEFINITION PHASE ------------------- #
-    global_step = tf.get_variable('global_step', dtype=tf.int32, initializer=0, trainable=False)
-
-    # Input pipeline
-    with tf.device('/cpu:0'):
-        with tf.name_scope('input_pipeline'):
-            dataset = input_pipeline.create_dataset(dataset_csv, images_dir, num_epochs, batch_size)
-            iterator = dataset.make_one_shot_iterator()
-            images, labels = iterator.get_next()
-
-            tf.summary.image('input', images, max_outputs=batch_size)
+def alexnet(images, labels, mode, params):
+    # Parameters
+    num_classes = params.get('num_classes', 2)
+    learning_rate = params.get('learning_rate', 1e-5)
 
     # Model
     print(images.get_shape().as_list())
@@ -65,60 +39,29 @@ def main(dataset_csv, images_dir, num_epochs, batch_size, learning_rate, logdir,
     tf.summary.histogram('fc1', fc1)
     fc2 = fully_connected(fc1, units=4096, dropout_rate=0.5, scope='fc2')
     tf.summary.histogram('fc2', fc2)
-    logits = fully_connected(fc2, activation=None, units=NUMBER_CLASSES, scope='fc3')
+    logits = fully_connected(fc2, activation=None, units=num_classes, scope='fc3')
     tf.summary.histogram('logits', logits)
     softmax = tf.nn.softmax(logits, name='softmax')
+
+    # Prediction
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        predictions = {'probabilities': softmax}
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
 
     # Loss
     xe_loss_op = tf.losses.softmax_cross_entropy(labels, logits)
     loss_op = tf.losses.get_total_loss()
     tf.summary.scalar('loss', loss_op)
 
+    # Eval
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(
+            mode, loss=loss_op, eval_metric_ops=[])
+
     # Optimizer
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    train_step = optimizer.minimize(loss_op, global_step=global_step)
-
-    # Summary writer
-    writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
-    summary_op = tf.summary.merge_all()
-
-    # Weight saver
-    model_checkpoint_path = os.path.join(logdir, 'alexnet')
-    saver = tf.train.Saver()
-
-    num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
-    print('*' * 80)
-    print('Num trainable parameters: {!r}'.format(num_trainable_params))
-    print('*' * 80)
-
-    num_trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
-    print('*' * 80)
-    print('Num trainable parameters: {!r}'.format(num_trainable_params))
-    print('*' * 80)
-
-    # Summary writer
-    writer = tf.summary.FileWriter(logdir, graph=tf.get_default_graph())
-
-    # ----------------- RUN PHASE ------------------- #
-    with tf.Session() as sess:
-        if restore_weights:
-            saver.restore(sess, restore_weights)
-        else:
-            sess.run(tf.global_variables_initializer())
-        try:
-            while True:
-                # Run the train step
-                _, loss, step, summ_val = sess.run([train_step, loss_op, global_step, summary_op])
-                # Print how the loss is evolving per step in order to check if the model is converging
-                if step % STEPS_LOSS_LOG == 0:
-                    print('Step {}\tLoss={}'.format(step, loss))
-                    writer.add_summary(summ_val, global_step=step)
-                # Save the graph definition and its weights
-                if step % STEPS_SAVER == 0:
-                    print('Step {}\tSaving weights to {}'.format(step, model_checkpoint_path))
-                    saver.save(sess, save_path=model_checkpoint_path, global_step=global_step)
-        except tf.errors.OutOfRangeError:
-            pass
+    train_op = optimizer.minimize(loss_op, global_step=tf.train.get_global_step())
+    return tf.estimator.EstimatorSpec(mode, loss=loss_op, train_op=train_op)
 
 
 def conv_layer(inputs, filters, kernel_size, strides=(1, 1), lrn=False, max_pool=False, padding='valid',
@@ -149,18 +92,3 @@ def fully_connected(inputs, units, activation=tf.nn.relu, dropout_rate=None, sco
             output = tf.layers.Dropout(rate=dropout_rate)(output, training=True)
 
         return output
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Pipeline execution')
-    parser.add_argument('dataset_csv', help='Path to the CSV decribing the dataset')
-    parser.add_argument('images_dir', help='Path to the images directory')
-    parser.add_argument('-l', '--logdir', default='~/tmp/aidl', help='Log dir for tfevents')
-    parser.add_argument('-e', '--num_epochs', type=int, default=1, help='Number of epochs')
-    parser.add_argument('-b', '--batch_size', type=int, default=5, help='Batch size')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5, help='Learning rate')
-    parser.add_argument('-r', '--restore', help='Path to model checkpoint to restore weights from.')
-    args = parser.parse_args()
-
-    main(args.dataset_csv, args.images_dir, args.num_epochs, args.batch_size, args.learning_rate, args.logdir,
-         args.restore)
